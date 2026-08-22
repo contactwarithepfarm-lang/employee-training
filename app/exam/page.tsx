@@ -28,7 +28,10 @@ type ExamUser = {
 };
 
 type AnswerMap = Record<number, Choice>;
-
+type ResultItem = {
+  question: Question;
+  selectedAnswer?: Choice;
+};
 const EXAM_DURATION = 15 * 60;
 
 export default function ExamPage() {
@@ -741,19 +744,20 @@ export default function ExamPage() {
   ========================================== */
 
   if (finished) {
-    return (
-      <FinishedScreen
-        user={user}
-        score={currentScore}
-        total={questions.reduce(
-          (sum, item) => sum + item.score,
-          0
-        )}
-        router={router}
-      />
-    );
-  }
-
+  return (
+    <FinishedScreen
+      user={user}
+      score={currentScore}
+      total={questions.reduce(
+        (sum, item) => sum + item.score,
+        0
+      )}
+      questions={questions}
+      answers={answers}
+      router={router}
+    />
+  );
+}
   /* ==========================================
      START SCREEN
   ========================================== */
@@ -1148,47 +1152,75 @@ function StartScreen({
   );
 }
 
-/* ==========================================
-   FINISHED SCREEN
-========================================== */
-
 function FinishedScreen({
   user,
   score,
   total,
+  questions,
+  answers,
   router,
 }: {
   user: ExamUser | null;
   score: number;
   total: number;
+  questions: Question[];
+  answers: AnswerMap;
   router: ReturnType<typeof useRouter>;
 }) {
+  const correctCount = questions.filter(
+    (item) => answers[item.id] === item.correct_answer
+  ).length;
+
+  const wrongCount = questions.filter(
+    (item) =>
+      answers[item.id] &&
+      answers[item.id] !== item.correct_answer
+  ).length;
+
+  const unansweredCount = questions.filter(
+    (item) => !answers[item.id]
+  ).length;
+
+  function getChoiceText(
+    question: Question,
+    answer?: Choice
+  ) {
+    if (!answer) return "ไม่ได้ตอบ";
+
+    if (answer === "A") return question.choice_a;
+    if (answer === "B") return question.choice_b;
+    if (answer === "C") return question.choice_c;
+
+    return question.choice_d;
+  }
+
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#06154f] px-6 text-white">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-1/2 h-[500px] w-[500px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/10 blur-[130px]" />
-      </div>
+    <main className="min-h-screen bg-[#06154f] px-4 py-8 text-white md:px-6">
+      <div className="mx-auto max-w-4xl">
 
-      <div className="relative w-full max-w-xl rounded-3xl border border-cyan-300/20 bg-gradient-to-br from-[#09276f] to-[#07194d] p-8 text-center shadow-[0_0_70px_rgba(0,150,255,0.2)]">
-        <div className="text-7xl">🏆</div>
+        {/* HEADER */}
+        <div className="text-center">
+          <div className="text-7xl">🏆</div>
 
-        <div className="mt-5 text-sm font-black tracking-[0.3em] text-cyan-300">
-          EXAM COMPLETED
+          <div className="mt-5 text-sm font-black tracking-[0.3em] text-cyan-300">
+            EXAM COMPLETED
+          </div>
+
+          <h1 className="mt-3 text-4xl font-black md:text-5xl">
+            สอบเสร็จแล้ว!
+          </h1>
+
+          {user && (
+            <p className="mt-3 text-blue-100/50">
+              {user.firstName} {user.lastName}
+            </p>
+          )}
         </div>
 
-        <h1 className="mt-3 text-4xl font-black">
-          สอบเสร็จแล้ว!
-        </h1>
+        {/* SCORE */}
+        <div className="mt-8 rounded-3xl border border-cyan-300/20 bg-gradient-to-br from-[#09276f] to-[#07194d] p-7 text-center shadow-[0_0_70px_rgba(0,150,255,0.15)]">
 
-        {user && (
-          <p className="mt-3 text-blue-100/50">
-            {user.firstName}{" "}
-            {user.lastName}
-          </p>
-        )}
-
-        <div className="mt-8 rounded-3xl border border-cyan-300/20 bg-black/20 p-7">
-          <div className="text-sm text-blue-100/40">
+          <div className="text-sm font-bold text-blue-100/40">
             คะแนนของคุณ
           </div>
 
@@ -1198,19 +1230,190 @@ function FinishedScreen({
               / {total}
             </span>
           </div>
+
+          <div className="mt-7 grid grid-cols-3 gap-3">
+
+            <div className="rounded-2xl border border-green-400/20 bg-green-400/10 p-4">
+              <div className="text-2xl">✅</div>
+              <div className="mt-1 text-2xl font-black text-green-300">
+                {correctCount}
+              </div>
+              <div className="text-xs text-green-200/50">
+                ตอบถูก
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-red-400/20 bg-red-400/10 p-4">
+              <div className="text-2xl">❌</div>
+              <div className="mt-1 text-2xl font-black text-red-300">
+                {wrongCount}
+              </div>
+              <div className="text-xs text-red-200/50">
+                ตอบผิด
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-yellow-400/20 bg-yellow-400/10 p-4">
+              <div className="text-2xl">⚪</div>
+              <div className="mt-1 text-2xl font-black text-yellow-300">
+                {unansweredCount}
+              </div>
+              <div className="text-xs text-yellow-200/50">
+                ไม่ได้ตอบ
+              </div>
+            </div>
+
+          </div>
         </div>
 
+        {/* RESULT DETAIL */}
+        <div className="mt-6">
+
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <div className="text-xs font-black tracking-[0.2em] text-cyan-300">
+                ANSWER REVIEW
+              </div>
+
+              <h2 className="mt-1 text-2xl font-black">
+                ตรวจคำตอบ
+              </h2>
+            </div>
+
+            <div className="rounded-full border border-blue-300/20 bg-white/5 px-4 py-2 text-sm font-bold text-blue-100/50">
+              {questions.length} ข้อ
+            </div>
+          </div>
+
+          <div className="space-y-4">
+
+            {questions.map((item, index) => {
+              const selected = answers[item.id];
+
+              const isCorrect =
+                selected === item.correct_answer;
+
+              const isUnanswered = !selected;
+
+              return (
+                <div
+                  key={item.id}
+                  className={`rounded-3xl border p-5 md:p-6 ${
+                    isCorrect
+                      ? "border-green-400/20 bg-green-400/5"
+                      : isUnanswered
+                      ? "border-yellow-400/20 bg-yellow-400/5"
+                      : "border-red-400/20 bg-red-400/5"
+                  }`}
+                >
+
+                  {/* QUESTION */}
+                  <div className="flex gap-3">
+
+                    <div
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl font-black ${
+                        isCorrect
+                          ? "bg-green-400/20 text-green-300"
+                          : isUnanswered
+                          ? "bg-yellow-400/20 text-yellow-300"
+                          : "bg-red-400/20 text-red-300"
+                      }`}
+                    >
+                      {index + 1}
+                    </div>
+
+                    <div className="flex-1">
+
+                      <div className="flex items-start justify-between gap-3">
+
+                        <h3 className="font-black leading-7">
+                          {item.question}
+                        </h3>
+
+                        <div className="shrink-0 text-xl">
+                          {isCorrect
+                            ? "✅"
+                            : isUnanswered
+                            ? "⚪"
+                            : "❌"}
+                        </div>
+
+                      </div>
+
+                      {/* YOUR ANSWER */}
+                      <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+
+                        <div className="text-xs font-black tracking-wider text-blue-100/40">
+                          คำตอบของคุณ
+                        </div>
+
+                        <div
+                          className={`mt-2 font-bold ${
+                            isCorrect
+                              ? "text-green-300"
+                              : isUnanswered
+                              ? "text-yellow-300"
+                              : "text-red-300"
+                          }`}
+                        >
+                          {selected
+                            ? `${selected}. ${getChoiceText(
+                                item,
+                                selected
+                              )}`
+                            : "ไม่ได้ตอบ"}
+                        </div>
+
+                      </div>
+
+                      {/* CORRECT ANSWER */}
+                      {!isCorrect && (
+                        <div className="mt-3 rounded-2xl border border-green-400/20 bg-green-400/5 p-4">
+
+                          <div className="text-xs font-black tracking-wider text-green-300/50">
+                            เฉลยที่ถูกต้อง
+                          </div>
+
+                          <div className="mt-2 font-bold text-green-300">
+                            {item.correct_answer}.{" "}
+                            {getChoiceText(
+                              item,
+                              item.correct_answer
+                            )}
+                          </div>
+
+                        </div>
+                      )}
+
+                      {/* SCORE */}
+                      <div className="mt-3 text-right text-xs font-bold text-blue-100/30">
+                        คะแนนข้อนี้:{" "}
+                        {isCorrect ? item.score : 0} /{" "}
+                        {item.score}
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })}
+
+          </div>
+        </div>
+
+        {/* HOME BUTTON */}
         <button
           onClick={() => router.push("/")}
-          className="mt-7 w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 py-4 font-black shadow-[0_0_30px_rgba(0,200,255,0.25)] transition hover:scale-[1.02]"
+          className="mt-8 w-full rounded-2xl bg-gradient-to-r from-cyan-400 to-blue-500 py-4 font-black shadow-[0_0_30px_rgba(0,200,255,0.25)] transition hover:scale-[1.01]"
         >
           🏠 กลับหน้าหลัก
         </button>
+
       </div>
     </main>
   );
 }
-
 /* ==========================================
    EXAM INFO
 ========================================== */
