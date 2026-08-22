@@ -68,9 +68,11 @@ export default function RegisterPage() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [examCode, setExamCode] = useState("");
-  const [branch, setBranch] = useState("");
 
+  // ใช้ชื่อจริงภาษาอังกฤษแทนรหัสเข้าสอบ
+  const [examCode, setExamCode] = useState("");
+
+  const [branch, setBranch] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -78,7 +80,10 @@ export default function RegisterPage() {
 
     const cleanFirstName = firstName.trim();
     const cleanLastName = lastName.trim();
+
+    // ตัดช่องว่างหัวท้าย
     const cleanExamCode = examCode.trim();
+
     const cleanBranch = branch.trim();
 
     if (
@@ -91,27 +96,40 @@ export default function RegisterPage() {
       return;
     }
 
+    // ตรวจว่าชื่อภาษาอังกฤษมีเฉพาะ A-Z / a-z
+    if (!/^[A-Za-z]+$/.test(cleanExamCode)) {
+      alert(
+        "ชื่อจริงภาษาอังกฤษต้องใช้ตัวอักษรภาษาอังกฤษเท่านั้น\n\n" +
+          "ตัวอย่าง: John"
+      );
+      return;
+    }
+
     if (loading) return;
 
     try {
       setLoading(true);
 
       // ==========================================
-      // CHECK DUPLICATE EXAM CODE
+      // CHECK DUPLICATE ENGLISH NAME
+      // ไม่สนตัวพิมพ์เล็ก / ใหญ่
+      // John = JOHN = john = JoHn
       // ==========================================
 
       const { data: existingUser, error: checkError } =
         await supabase
           .from("exam_users")
-          .select("id, first_name, last_name, status")
-          .eq("exam_code", cleanExamCode)
+          .select(
+            "id, first_name, last_name, exam_code, status"
+          )
+          .ilike("exam_code", cleanExamCode)
           .maybeSingle();
 
       if (checkError) {
         console.error(checkError);
 
         alert(
-          "ไม่สามารถตรวจสอบรหัสเข้าสอบได้\n\n" +
+          "ไม่สามารถตรวจสอบชื่อภาษาอังกฤษได้\n\n" +
             checkError.message
         );
 
@@ -119,13 +137,13 @@ export default function RegisterPage() {
       }
 
       // ==========================================
-      // CODE ALREADY EXISTS
+      // ENGLISH NAME ALREADY EXISTS
       // ==========================================
 
       if (existingUser) {
         alert(
-          "รหัสเข้าสอบนี้ถูกใช้งานแล้ว\n\n" +
-            "กรุณาสร้างรหัสใหม่"
+          "ชื่อภาษาอังกฤษนี้ถูกใช้งานแล้ว\n\n" +
+            "กรุณาตรวจสอบชื่อของคุณอีกครั้ง"
         );
 
         return;
@@ -141,7 +159,10 @@ export default function RegisterPage() {
           .insert({
             first_name: cleanFirstName,
             last_name: cleanLastName,
+
+            // เก็บชื่อภาษาอังกฤษไว้ใน exam_code
             exam_code: cleanExamCode,
+
             branch: cleanBranch,
             status: "not_started",
             score: 0,
@@ -178,13 +199,19 @@ export default function RegisterPage() {
           id: newUser.id,
           firstName: newUser.first_name,
           lastName: newUser.last_name,
+
+          // ชื่อจริงภาษาอังกฤษ
           examCode: newUser.exam_code,
+
           branch: newUser.branch,
           status: newUser.status,
         })
       );
 
-      // ล้าง Session เก่าของรหัสนี้
+      // ==========================================
+      // CLEAR OLD SESSION
+      // ==========================================
+
       localStorage.removeItem(
         `exam_session_${newUser.exam_code}`
       );
@@ -207,6 +234,7 @@ export default function RegisterPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#06154f] px-6 py-10 text-white">
+
       {/* BACKGROUND GLOW */}
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -left-40 top-10 h-[500px] w-[500px] rounded-full bg-blue-500/20 blur-[140px]" />
@@ -217,8 +245,10 @@ export default function RegisterPage() {
       </div>
 
       <div className="relative z-10 mx-auto max-w-xl">
+
         {/* HEADER */}
         <div className="mb-8 text-center">
+
           <div className="text-sm font-black tracking-[0.3em] text-cyan-300">
             EMPLOYEE TRAINING
           </div>
@@ -230,6 +260,7 @@ export default function RegisterPage() {
           <p className="mt-3 text-blue-100/50">
             กรอกข้อมูลเพื่อเข้าสู่ Training Arena
           </p>
+
         </div>
 
         {/* FORM */}
@@ -237,7 +268,9 @@ export default function RegisterPage() {
           onSubmit={handleSubmit}
           className="rounded-[30px] border border-cyan-300/20 bg-gradient-to-br from-[#09276f] to-[#07194d] p-7 shadow-[0_0_60px_rgba(0,120,255,0.15)] md:p-8"
         >
+
           <div className="space-y-5">
+
             {/* FIRST NAME */}
             <Input
               label="ชื่อ"
@@ -254,10 +287,11 @@ export default function RegisterPage() {
               onChange={setLastName}
             />
 
-            {/* EXAM CODE */}
+            {/* ENGLISH NAME */}
             <div>
+
               <label className="mb-2 block text-sm font-bold text-blue-100/70">
-                รหัสเข้าสอบ
+                ชื่อจริงภาษาอังกฤษ
               </label>
 
               <input
@@ -265,18 +299,27 @@ export default function RegisterPage() {
                 onChange={(e) =>
                   setExamCode(e.target.value)
                 }
-                placeholder="สร้างรหัสของคุณเอง"
+                placeholder="เช่น John"
                 autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 className="w-full rounded-xl border border-blue-300/15 bg-[#050f38] px-4 py-4 text-white outline-none transition placeholder:text-blue-100/20 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/10"
               />
 
               <p className="mt-2 text-xs text-blue-100/30">
-                🔐 ใช้รหัสนี้สำหรับกลับเข้ามาทำข้อสอบต่อ
+                🔐 ใช้ชื่อจริงภาษาอังกฤษสำหรับเข้าสอบ
               </p>
+
+              <p className="mt-1 text-xs text-cyan-300/50">
+                ตัวพิมพ์เล็กและตัวพิมพ์ใหญ่ถือว่าเหมือนกัน
+              </p>
+
             </div>
 
             {/* BRANCH */}
             <div>
+
               <label className="mb-2 block text-sm font-bold text-blue-100/70">
                 สาขา
               </label>
@@ -288,27 +331,37 @@ export default function RegisterPage() {
                 }
                 className="w-full rounded-xl border border-blue-300/15 bg-[#050f38] px-4 py-4 text-white outline-none transition focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/10"
               >
+
                 <option value="">
                   -- เลือกสาขา --
                 </option>
 
                 {branches.map((item) => (
-                  <option key={item} value={item}>
+                  <option
+                    key={item}
+                    value={item}
+                  >
                     {item}
                   </option>
                 ))}
+
               </select>
+
             </div>
+
           </div>
 
           {/* INFO */}
           <div className="mt-6 rounded-2xl border border-cyan-300/10 bg-cyan-400/5 p-4">
+
             <div className="text-sm font-black text-cyan-300">
               🎯 ข้อมูลการสอบ
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+
               <div className="rounded-xl bg-black/10 p-3">
+
                 <div className="text-blue-100/40">
                   ข้อสอบ
                 </div>
@@ -316,9 +369,11 @@ export default function RegisterPage() {
                 <div className="mt-1 font-black">
                   📝 15 ข้อ
                 </div>
+
               </div>
 
               <div className="rounded-xl bg-black/10 p-3">
+
                 <div className="text-blue-100/40">
                   เวลา
                 </div>
@@ -326,8 +381,11 @@ export default function RegisterPage() {
                 <div className="mt-1 font-black">
                   ⏱️ 15 นาที
                 </div>
+
               </div>
+
             </div>
+
           </div>
 
           {/* SUBMIT */}
@@ -344,8 +402,11 @@ export default function RegisterPage() {
               ? "⏳ กำลังลงทะเบียน..."
               : "🚀 ยืนยันและเข้าสอบ"}
           </button>
+
         </form>
+
       </div>
+
     </main>
   );
 }
@@ -367,6 +428,7 @@ function Input({
 }) {
   return (
     <div>
+
       <label className="mb-2 block text-sm font-bold text-blue-100/70">
         {label}
       </label>
@@ -379,6 +441,7 @@ function Input({
         placeholder={placeholder}
         className="w-full rounded-xl border border-blue-300/15 bg-[#050f38] px-4 py-4 text-white outline-none transition placeholder:text-blue-100/20 focus:border-cyan-300 focus:ring-2 focus:ring-cyan-300/10"
       />
+
     </div>
   );
 }
